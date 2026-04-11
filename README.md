@@ -1,1 +1,1 @@
-# ADP2_asik2_generated
+generated proto files
