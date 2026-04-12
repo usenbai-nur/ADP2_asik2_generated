@@ -1,1 +1,71 @@
+name: Generate Go Proto Files
 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/generate.yml"
+      - "go.mod"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout generated repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Set up protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.3"
+
+      - name: Install Go protobuf plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Clone proto repository
+        run: |
+          git clone https://github.com/usenbai-nur/ADP2_asik2_protos.git proto-src
+
+      - name: Clean old generated files
+        run: |
+          rm -rf order payment
+
+      - name: Generate Go files
+        run: |
+          cd proto-src
+          protoc \
+            --proto_path=. \
+            --go_out=../ \
+            --go_opt=paths=source_relative \
+            --go-grpc_out=../ \
+            --go-grpc_opt=paths=source_relative \
+            order/v1/order.proto \
+            payment/v1/payment.proto
+
+      - name: Show generated files
+        run: |
+          find order payment -type f || true
+
+      - name: Commit and push generated files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --cached --quiet && echo "No changes to commit" || git commit -m "generate protobuf files"
+          git push
